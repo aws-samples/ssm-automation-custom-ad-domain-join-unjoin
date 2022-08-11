@@ -211,7 +211,7 @@ Resources:
                   Key: ADJoined
             timeoutSeconds: 30
             isEnd: false
-            nextStep: rebootServer
+            nextStep: stopServer
           - name: failADEC2Tag
             action: aws:createTags
             description: Update the ADJoined EC2 tag to reflect a failure in the AD domain join/unjoin process.

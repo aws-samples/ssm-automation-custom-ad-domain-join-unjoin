@@ -272,6 +272,8 @@ Resources:
             Action:
               - sts:AssumeRole
       Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
       Policies:
         - PolicyName: CustomSSMParameterStorePolicyCFN
           PolicyDocument:
@@ -299,7 +301,14 @@ Resources:
                 Effect: Allow
                 Action:
                   - ssm:DescribeParameters
-                Resource: '*'
+                Resource:
+                  - !Join
+                    - ''
+                    - - 'arn:'
+                      - !Ref 'AWS::Partition'
+                      - ':ssm:*:'
+                      - !Ref 'AWS::AccountId'
+                      - :parameter/domain*
       Description: New IAM role configure Lambda execution and Amazon Systems Manager Parameter Store permissions.
   SSMSecureStringFunction:
     Type: AWS::Lambda::Function
@@ -387,7 +396,6 @@ Resources:
         - !Ref SSMSecureStringLambdaExecution
   InvokeSSMSecureStringFunction:
     Type: Custom::InvokeLambda
-    DependsOn: SSMSecureStringFunction
     Properties:
       ServiceToken: !GetAtt SSMSecureStringFunction.Arn
       ssm_secure_string: !Ref SSMSecureStringADPassword

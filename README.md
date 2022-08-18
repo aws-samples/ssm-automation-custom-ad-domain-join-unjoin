@@ -29,7 +29,7 @@ Below are details of the parameters that are created by the CloudFormation stack
 |domainName	|String	|text	|corp.example.com	|No	|
 |domainJoinUserName	|String	|text	|CORP\Admin	|No	|
 |domainJoinPassword	|SecureString	|text	|YOURPASSWORD	|Yes	|
-|defaultTargetOU	|String	|text	|**OU=Computers,OU=CORP,dc=corp,dc=example,dc=com**	|No	|
+|defaultTargetOU	|String	|text	|OU=Computers,OU=CORP,dc=corp,dc=example,dc=com	|No	|
 
 ## PowerShell
 

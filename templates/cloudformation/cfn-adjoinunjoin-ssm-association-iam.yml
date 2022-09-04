@@ -1,0 +1,117 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Deploy AWS Systems Manager State Manager associations to automate domain join and domain unjoin with associated IAM roles and policies.
+Parameters:
+  SSMAutomationDocumentName:
+    Description: 'Enter the automation runbook which will join or unjoin an EC2 Windows instance to Active Directory (AD).'
+    Type: String
+    AllowedPattern: ^[a-zA-Z0-9_\-.]{3,128}$
+  SSMAssociationADJoinName:
+    Description: 'Specify a descriptive name for the association to automate AD domain join. Valid characters are a-z, A-Z, 0-9, and _, -, and . only.'
+    Type: String
+    AllowedPattern: ^[a-zA-Z0-9_\-.]{3,128}$
+  SSMAssociationADUnjoinName:
+    Description: 'Specify a descriptive name for the association to automate AD domain unjoin.'
+    Type: String
+    AllowedPattern: ^[a-zA-Z0-9_\-.]{3,128}$
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: AWS Systems Manager Automation runbook name
+        Parameters:
+          - SSMAutomationDocumentName
+          - SSMAssociationADJoinName
+          - SSMAssociationADUnjoinName
+    ParameterLabels:
+      SSMAutomationDocumentName:
+        default: Automation runbook name
+      SSMAssociationADJoinName:
+        default: AD join association name
+      SSMAssociationADUnjoinName:
+        default: AD unjoin association name
+Resources:
+  SSMAssociationIAMPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Description will go here
+      Path: /
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'ec2:CreateTags'
+              - 'ec2:DescribeTags'
+              - 'ec2:DescribeInstances'
+              - 'ec2:RebootInstances'
+              - 'ec2:StopInstances'
+              - 'ssm:DescribeInstanceInformation'
+              - 'ssm:List*'
+              - 'ssm:SendCommand'
+            Resource: '*'
+  SSMAssociationADJoinIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ssm.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - !Ref SSMAssociationIAMPolicy
+      Description: New IAM Role to allow SSM State Manager Associations to allow AD domain join.
+  SSMAssociationADUnjoinIAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ssm.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - !Ref SSMAssociationIAMPolicy
+      Description: New IAM Role to allow SSM State Manager Associations to allow AD domain unjoin.
+  SSMAssociationADJoin:
+    Type: AWS::SSM::Association
+    Properties:
+      AssociationName: !Ref SSMAssociationADJoinName
+      ApplyOnlyAtCronInterval: True
+      Name: !Ref SSMAutomationDocumentName
+      ScheduleExpression: cron(0 0 */1 * * ? *)
+      AutomationTargetParameterName: InstanceId
+      Targets:
+        - Key: tag:ADJoined
+          Values:
+            - 'ADD'
+      Parameters:
+        AutomationAssumeRole:
+          - !GetAtt SSMAssociationADJoinIAMRole.Arn
+        DomainJoinActivity:
+          - Join
+  SSMAssociationADUnjoin:
+    Type: AWS::SSM::Association
+    Properties:
+      AssociationName: !Ref SSMAssociationADUnjoinName
+      ApplyOnlyAtCronInterval: True
+      Name: !Ref SSMAutomationDocumentName
+      ScheduleExpression: cron(0 0 */1 * * ? *)
+      AutomationTargetParameterName: InstanceId
+      Targets:
+        - Key: tag:ADJoined
+          Values:
+            - 'REMOVE'
+      Parameters:
+        AutomationAssumeRole:
+          - !GetAtt SSMAssociationADUnjoinIAMRole.Arn
+        DomainJoinActivity:
+          - Unjoin

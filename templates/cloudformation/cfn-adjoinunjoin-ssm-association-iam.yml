@@ -10,7 +10,7 @@ Parameters:
     Type: String
     AllowedPattern: ^[a-zA-Z0-9_\-.]{3,128}$
   SSMAssociationADUnjoinName:
-    Description: 'Specify a descriptive name for the association to automate AD domain unjoin.'
+    Description: 'Specify a descriptive name for the association to automate AD domain unjoin. Valid characters are a-z, A-Z, 0-9, and _, -, and . only.'
     Type: String
     AllowedPattern: ^[a-zA-Z0-9_\-.]{3,128}$
 Metadata:

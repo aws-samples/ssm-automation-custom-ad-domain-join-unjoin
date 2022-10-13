@@ -38,16 +38,26 @@ Resources:
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
-          - Effect: Allow
+          - Sid: EC2TagConditions
+            Effect: Allow
             Action:
-              - 'ec2:CreateTags'
-              - 'ec2:DescribeTags'
-              - 'ec2:DescribeInstances'
-              - 'ec2:RebootInstances'
-              - 'ec2:StopInstances'
-              - 'ssm:DescribeInstanceInformation'
-              - 'ssm:List*'
-              - 'ssm:SendCommand'
+              - ec2:RebootInstances
+              - ec2:CreateTags
+              - ec2:StopInstances
+            Resource: '*'
+            Condition:
+              StringLike:
+                aws:RequestTag/ADJoined:
+                  - ADD
+                  - REMOVE
+          - Sid: EC2SSMDescribe
+            Effect: Allow
+            Action:
+              - ec2:DescribeInstances
+              - ec2:DescribeTags
+              - ssm:DescribeInstanceInformation
+              - ssm:List*
+              - ssm:SendCommand
             Resource: '*'
   SSMAssociationADJoinIAMRole:
     Type: AWS::IAM::Role

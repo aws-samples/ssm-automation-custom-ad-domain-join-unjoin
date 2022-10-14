@@ -33,7 +33,7 @@ Resources:
   SSMAssociationIAMPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
-      Description: Description will go here
+      Description: Custom IAM Policy to allow SSM State Manager Associations to allow AD domain join/unjoin.
       Path: /
       PolicyDocument:
         Version: '2012-10-17'
@@ -42,17 +42,20 @@ Resources:
             Effect: Allow
             Action:
               - ec2:RebootInstances
-              - ec2:CreateTags
               - ec2:StopInstances
             Resource: '*'
             Condition:
               StringLike:
-                aws:RequestTag/ADJoined:
+                aws:ResourceTag/ADJoined:
                   - ADD
                   - REMOVE
+                  - Join-complete
+                  - Unjoin-complete
+                  - Failed
           - Sid: EC2SSMDescribe
             Effect: Allow
             Action:
+              - ec2:CreateTags
               - ec2:DescribeInstances
               - ec2:DescribeTags
               - ssm:DescribeInstanceInformation

@@ -1,0 +1,302 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create two EventBridge rules to AD domain join and domain unjoin and associated IAM roles/policies. A demo Auto Scaling Group with Lifecycle hooks are created to demonstrate scale and AD joining/unjoining support.
+Parameters:
+  ImageIdParameter:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-windows-latest/Windows_Server-2019-English-Core-Base
+    Description: 'Enter an AMI Id. The default value is Windows Server 2019 Core:
+      /aws/service/ami-windows-latest/Windows_Server-2019-English-Core-Base.'
+  InstanceTypeParameter:
+    Type: String
+    Default: t3.medium
+    AllowedValues:
+      - t3.medium
+      - m5.large
+      - c5.large
+    Description: Select an instance type. The default instance type is t3.medium.
+  LaunchTemplateSecurityGroupParameter:
+    Type: List<AWS::EC2::SecurityGroup::Id>
+    Description: Select EC2 security group to assign to the launch template.
+  VpcIdParameter:
+    Type: List<AWS::EC2::VPC::Id>
+    Description: List of Virtual Private Cloud (VPC) Ids in your account.
+  SNSEndpointParameter:
+    Type: String
+    Default: user@email.com
+    Description: Type the email address that will receive Auto Scaling notifications.
+  ASGMinSizeParameter:
+    Type: Number
+    Default: 0
+    Description: Minimum instance size for the Auto Scaling Group.
+  ASGMaxSizeParameter:
+    Type: Number
+    Default: 4
+    Description: Maximum instance size for the Auto Scaling Group.
+  ASGDesiredCapacityParameter:
+    Type: Number
+    Default: 0
+    Description: Desired capacity instance size for the Auto Scaling Group.
+  ASGSubnetParameter:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Select EC2 subnets to assign to the Auto Scaling Group.
+  KMSKeyArnParameter:
+    Type: String
+    Description: Type the KMS key ARN used to encrypt/decrypt the AD domain join password.
+  SSMAutomationRunbookParameter:
+    Type: String
+    Description: Type the name of the SSM Automation runbook that performs the AD domain join and unjoin.
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Launch Template Configuration
+        Parameters:
+          - ImageIdParameter
+          - InstanceTypeParameter
+          - LaunchTemplateSecurityGroupParameter
+      - Label:
+          default: Amazon EC2 Auto Scaling Configuration
+        Parameters:
+          - ASGDesiredCapacityParameter
+          - ASGMinSizeParameter
+          - ASGMaxSizeParameter
+          - ASGSubnetParameter
+      - Label:
+          default: Misc. Configuration
+        Parameters:
+          - VpcIdParameter
+          - KMSKeyArnParameter
+          - SSMAutomationRunbookParameter
+    ParameterLabels:
+      ImageIdParameter:
+        default: Amazon Machine Image (AMI) Id
+      InstanceTypeParameter:
+        default: Instance Type
+      LaunchTemplateSecurityGroupParameter:
+        default: Security Group
+      VpcIdParameter:
+        default: Vpc Id
+      ASGSubnetParameter:
+        default: VPC Subnets
+      ASGMinSizeParameter:
+        default: Minimum Size
+      ASGMaxSizeParameter:
+        default: Maximum Size
+      ASGDesiredCapacityParameter:
+        default: Desired Capacity
+      KMSKeyArnParameter:
+        default: KMS Key ARN
+      SSMAutomationRunbookParameter:
+        default: AWS Systems Manager Automation Runbook
+Resources:
+  SSMAssumeRoleResource:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: !Sub 'ssm.amazonaws.com'
+            Action: sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+  SSMEC2SSMPermissionsCFNResource:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: SSMEC2SSMPermissionsCFN
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: EC2TagConditions
+            Effect: Allow
+            Action:
+              - ec2:StopInstances
+              - ec2:RebootInstances
+            Resource:
+              - '*'
+            Condition:
+              StringLike:
+                aws:ResourceTag/ADJoined:
+                  - ADD
+                  - REMOVE
+                  - Join-complete
+                  - Unjoin-complete
+                  - Failed
+          - Sid: EC2SSMDescribe
+            Effect: Allow
+            Action:
+              - ec2:CreateTags
+              - ec2:DescribeInstances
+              - ec2:DescribeTags
+              - ssm:DescribeInstanceInformation
+              - ssm:List*
+              - ssm:SendCommand
+            Resource:
+              - '*'
+      Roles:
+        - !Ref 'SSMAssumeRoleResource'
+  SSMParametersCFNResource:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: SSMParametersCFN
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - kms:Decrypt
+              - ssm:DescribeParameters
+              - ssm:GetParameters
+              - ssm:GetParameter
+            Resource:
+              - !Ref 'KMSKeyArnParameter'
+              - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/domainJoinPassword'
+              - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/domainJoinUserName'
+              - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/domainName'
+              - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/defaultTargetOU-Windows'
+      Roles:
+        - !Ref 'SSMAssumeRoleResource'
+  EventBridgeInvokeRoleResource:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: !Sub 'events.amazonaws.com'
+            Action: sts:AssumeRole
+      Path: /service-role/
+      Policies:
+        - PolicyName: EVBInvokeRoleCFN
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action: ssm:StartAutomationExecution
+                Effect: Allow
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:*:automation-definition/${SSMAutomationRunbookParameter}:$DEFAULT'
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: !GetAtt 'SSMAssumeRoleResource.Arn'
+  EC2SSMRoleResource:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+      Description: New IAM Role to allow SSM access.
+  IamInstanceProfileResource:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref EC2SSMRoleResource
+  EC2LaunchTemplateResource:
+    Type: AWS::EC2::LaunchTemplate
+    DeletionPolicy: Delete
+    Properties:
+      LaunchTemplateData:
+        InstanceType: !Ref InstanceTypeParameter
+        ImageId: !Ref ImageIdParameter
+        SecurityGroupIds:
+          - !Select
+            - '0'
+            - !Ref LaunchTemplateSecurityGroupParameter
+        IamInstanceProfile:
+          Arn: !GetAtt IamInstanceProfileResource.Arn
+  SNSTopicResource:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+        - Endpoint: !Ref SNSEndpointParameter
+          Protocol: email
+  ASGResource:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      MinSize: !Ref ASGMinSizeParameter
+      MaxSize: !Ref ASGMaxSizeParameter
+      DesiredCapacity: !Ref ASGDesiredCapacityParameter
+      HealthCheckType: EC2
+      HealthCheckGracePeriod: 60
+      Cooldown: 30
+      LaunchTemplate:
+        LaunchTemplateId: !Ref EC2LaunchTemplateResource
+        Version: !GetAtt EC2LaunchTemplateResource.LatestVersionNumber
+      VPCZoneIdentifier:
+        - !Select
+          - '0'
+          - !Ref ASGSubnetParameter
+        - !Select
+          - '1'
+          - !Ref ASGSubnetParameter
+      LifecycleHookSpecificationList:
+        - LifecycleTransition: autoscaling:EC2_INSTANCE_LAUNCHING
+          LifecycleHookName: ADJoinLaunchHook
+          HeartbeatTimeout: 300
+          DefaultResult: CONTINUE
+        - LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
+          LifecycleHookName: ADUnjoinLaunchHook
+          HeartbeatTimeout: 300
+          DefaultResult: ABANDON
+      NotificationConfigurations:
+        - NotificationTypes:
+            - autoscaling:EC2_INSTANCE_LAUNCH
+            - autoscaling:EC2_INSTANCE_TERMINATE
+          TopicARN: !Ref SNSTopicResource
+  EVBADJoinRuleResource:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Rule that will join Auto Scaled EC2 Windows instance to AD domain at instance launch.
+      EventBusName: default
+      EventPattern:
+        source:
+          - aws.autoscaling
+        detail-type:
+          - EC2 Instance-launch Lifecycle Action
+        detail:
+          AutoScalingGroupName:
+            - !Ref ASGResource
+      State: ENABLED
+      Targets:
+        - Id: EVB-AD-Join
+          Arn: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:automation-definition/${SSMAutomationRunbookParameter}:$DEFAULT'
+          RoleArn: !GetAtt 'EventBridgeInvokeRoleResource.Arn'
+          InputTransformer:
+            InputPathsMap:
+              instanceid: $.detail.EC2InstanceId
+            InputTemplate: !Sub '{"AutomationAssumeRole":["arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${SSMAssumeRoleResource}"],"InstanceId":[<instanceid>],"DomainJoinActivity":["Join"]}'
+  EVBADUnjoinRuleResource:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Rule that will unjoin Auto Scaled EC2 Windows instance from AD domain prior to termination.
+      EventBusName: default
+      EventPattern:
+        source:
+          - aws.autoscaling
+        detail-type:
+          - EC2 Instance-terminate Lifecycle Action
+        detail:
+          AutoScalingGroupName:
+            - !Ref ASGResource
+      State: ENABLED
+      Targets:
+        - Id: EVB-AD-Unjoin
+          Arn: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:automation-definition/${SSMAutomationRunbookParameter}:$DEFAULT'
+          RoleArn: !GetAtt 'EventBridgeInvokeRoleResource.Arn'
+          InputTransformer:
+            InputPathsMap:
+              instanceid: $.detail.EC2InstanceId
+            InputTemplate: !Sub '{"AutomationAssumeRole":["arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${SSMAssumeRoleResource}"],"InstanceId":[<instanceid>],"DomainJoinActivity":["Unjoin"]}'

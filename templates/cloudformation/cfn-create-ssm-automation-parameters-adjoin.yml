@@ -290,25 +290,13 @@ Resources:
                   - ssm:GetParameter
                   - ssm:DeleteParameters
                 Resource:
-                  - !Join
-                    - ''
-                    - - 'arn:'
-                      - !Ref 'AWS::Partition'
-                      - ':ssm:*:'
-                      - !Ref 'AWS::AccountId'
-                      - :parameter/domain*
+                  - !Sub 'arn:${AWS::Partition}:ssm:*:${AWS::AccountId}:parameter/domain*'
               - Sid: DescParameterPermissions
                 Effect: Allow
                 Action:
                   - ssm:DescribeParameters
                 Resource:
-                  - !Join
-                    - ''
-                    - - 'arn:'
-                      - !Ref 'AWS::Partition'
-                      - ':ssm:*:'
-                      - !Ref 'AWS::AccountId'
-                      - :parameter/domain*
+                  - !Sub 'arn:${AWS::Partition}:ssm:*:${AWS::AccountId}:parameter/domain*'
       Description: New IAM role configure Lambda execution and Amazon Systems Manager Parameter Store permissions.
   SSMSecureStringFunction:
     Type: AWS::Lambda::Function

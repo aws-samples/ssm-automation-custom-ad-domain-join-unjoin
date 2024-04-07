@@ -387,3 +387,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt SSMSecureStringFunction.Arn
       ssm_secure_string: !Ref SSMSecureStringADPassword
+Outputs:
+  SSMAutomationARN:
+    Description: 'The full ARN of Automation runbook.'
+    Value: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:automation-definition/${SSMAutomationDocument}'

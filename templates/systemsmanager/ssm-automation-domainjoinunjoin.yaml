@@ -16,7 +16,7 @@ parameters:
       - Unjoin
       - ''
     default: ''
-    description: '(Required) Select which AD domain activity to perform, join or unjoin.'
+    description: '(Required) Select which AD domain activity to perform, join an AD domain or unjoin an AD domain.'
     type: String
 mainSteps:
   - name: assertInstanceIsWindows
@@ -54,10 +54,11 @@ mainSteps:
         commands: |-
           If ((Get-CimInstance -ClassName 'Win32_ComputerSystem' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty 'PartOfDomain') -eq $false) {
               Try {
-                  $targetOU = (Get-SSMParameterValue -Name 'defaultTargetOU' -ErrorAction Stop).Parameters[0].Value
-                  $domainName = (Get-SSMParameterValue -Name 'domainName' -ErrorAction Stop).Parameters[0].Value
-                  $domainJoinUserName = (Get-SSMParameterValue -Name 'domainJoinUserName' -ErrorAction Stop).Parameters[0].Value
-                  $domainJoinPassword = (Get-SSMParameterValue -Name 'domainJoinPassword' -WithDecryption:$true -ErrorAction Stop).Parameters[0].Value | ConvertTo-SecureString -AsPlainText -Force
+                  $jsonSecretValue = (Get-SECSecretValue -SecretId arn:aws:secretsmanager:us-east-1:497488328043:secret:SecretKeyADPasswordResource-8c8mC8elYy7i-h8xzcK).SecretString | ConvertFrom-Json
+                  $targetOU = $jsonSecretValue.defaultTargetOU
+                  $domainName = $jsonSecretValue.domainName
+                  $domainJoinUserName = $jsonSecretValue.domainJoinUserName
+                  $domainJoinPassword = $jsonSecretValue.domainJoinPassword | ConvertTo-SecureString -AsPlainText -Force
               } Catch [System.Exception] {
                   Write-Output " Failed to get SSM Parameter(s) $_"
               }
@@ -101,9 +102,10 @@ mainSteps:
         commands: |-
           If ((Get-CimInstance -ClassName 'Win32_ComputerSystem' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty 'PartOfDomain') -eq $true) {
               Try {
-                  $domainName = (Get-SSMParameterValue -Name 'domainName' -ErrorAction Stop).Parameters[0].Value
-                  $domainJoinUserName = (Get-SSMParameterValue -Name 'domainJoinUserName' -ErrorAction Stop).Parameters[0].Value
-                  $domainJoinPassword = (Get-SSMParameterValue -Name 'domainJoinPassword' -WithDecryption:$true -ErrorAction Stop).Parameters[0].Value | ConvertTo-SecureString -AsPlainText -Force
+                  $jsonSecretValue = (Get-SECSecretValue -SecretId arn:aws:secretsmanager:us-east-1:497488328043:secret:SecretKeyADPasswordResource-8c8mC8elYy7i-h8xzcK).SecretString | ConvertFrom-Json
+                  $domainName = $jsonSecretValue.domainName
+                  $domainJoinUserName = $jsonSecretValue.domainJoinUserName
+                  $domainJoinPassword = $jsonSecretValue.domainJoinPassword | ConvertTo-SecureString -AsPlainText -Force
               } Catch [System.Exception] {
                   Write-Output "Failed to get SSM Parameter(s) $_"
               }

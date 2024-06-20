@@ -3,9 +3,9 @@
 # Overview
 Please refer to blog post for more details: [https://aws.amazon.com/blogs/modernizing-with-aws/simplifying-active-directory-domain-join-with-aws-systems-manager/](https://aws.amazon.com/blogs/modernizing-with-aws/simplifying-active-directory-domain-join-with-aws-systems-manager/).
 
-Deploy a custom AWS Systems Manager Automation runbook that automatically domain joins or unjoins from an [Active Directory (AD) domain](https://docs.microsoft.com/en-us/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview). This runbook can be used with on-premises AD, self-managed AD running on [Amazon Elastic Compute Cloud (Amazon EC2) Windows instances](https://aws.amazon.com/windows/products/ec2/), or [AWS Managed Microsoft AD](https://aws.amazon.com/directoryservice/) and can be executed manually or automatically with AWS services such as [AWS Systems Manager](https://aws.amazon.com/systems-manager/), [Amazon EventBridge](https://aws.amazon.com/eventbridge/), or [AWS Lambda](https://aws.amazon.com/lambda/). The runbook leverages 4 parameters stored in [Systems Manager Parameter Store](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html), to store the AD domain name, AD domain username, AD domain user's password, and a specific Organizational Unit (OU) in AD. The AD domain user's password is encrypted and decrypted with [AWS Key Management Service (AWS KMS)](https://aws.amazon.com/kms/) as a secure string.
+Deploy a custom AWS Systems Manager Automation runbook that automatically domain joins or unjoins from an [Active Directory (AD) domain](https://docs.microsoft.com/en-us/windows-server/identity/ad-ds/get-started/virtual-dc/active-directory-domain-services-overview). This runbook can be used with on-premises AD, self-managed AD running on [Amazon Elastic Compute Cloud (Amazon EC2) Windows instances](https://aws.amazon.com/windows/products/ec2/), or [AWS Managed Microsoft AD](https://aws.amazon.com/directoryservice/) and can be executed manually or automatically with AWS services such as [AWS Systems Manager](https://aws.amazon.com/systems-manager/), [Amazon EventBridge](https://aws.amazon.com/eventbridge/), or [AWS Lambda](https://aws.amazon.com/lambda/). The runbook [create an AWS Secrets Manager secret](https://docs.aws.amazon.com/secretsmanager/latest/userguide/create_secret.html) with the AD credentials, AD domain name, and a specific Organizational Unit (OU) in AD.
 
-**NOTE:** This guide assumes DNS has been configured already for your Active Directory environment running in AWS. There are various methods to configure such an environment, either with [Amazon Route 53 Resolver endpoints](https://d1.awsstatic.com/whitepapers/aws-hybrid-dns-with-active-directory.pdf) or [DHCP option sets in Amazon VPC](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_DHCP_Options.html).
+> This guide assumes DNS has been configured already for your Active Directory environment running in AWS. There are various methods to configure such an environment, either with [Amazon Route 53 Resolver endpoints](https://d1.awsstatic.com/whitepapers/aws-hybrid-dns-with-active-directory.pdf) or [DHCP option sets in Amazon VPC](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_DHCP_Options.html).
 
 ## The Automation runbook workflow
 There are 9 steps in total in the Automation workflow. Below are descriptions of the key steps and how they factor into the AD domain join/unjoin activities.
@@ -18,22 +18,31 @@ There are 9 steps in total in the Automation workflow. Below are descriptions of
    - If either a domain join/unjoin fails, a **Failed** status is returned, the EC2 instance is tagged to reflect the failure (**failADEC2Tag**), and the EC2 instance is stopped.
    > The failures from the PowerShell are outputted and displayed in the Systems Manager Automation executions console. Users can troubleshoot the domain join/unjoin failures based on these common errors. Further enhancements can be made by additionally outputting the failures to [Amazon CloudWatch Logs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html) in custom [log groups created by Run Command](https://docs.aws.amazon.com/systems-manager/latest/userguide/sysman-rc-setting-up-cwlogs.html). To learn more about log groups, visit the [AWS documentation](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html).
 
-# Deploy the Automation runbook and parameters
-To deploy the runbook and parameters automatically, download and save the AWS CloudFormation template from Github, [**cfn-create-ssm-automation-parameters-adjoin.yml**](templates/cloudformation/cfn-create-ssm-automation-parameters-adjoin.yml), and save it locally to your computer to create a new CloudFormation stack. Creating a new stack will simplify the deployment of the Automation runbook and create the appropriate parameters to perform the AD join/unjoin activities automatically. To learn more about CloudFormation stack creation, visit the [AWS documentation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/GettingStarted.Walkthrough.html#GettingStarted.Walkthrough.createstack).
+# Deploy the Automation runbook
+To deploy the runbook and parameters automatically, download and save the AWS CloudFormation template from Github, [**cfn-create-ssm-automation-parameters-adjoin.yml**](templates/cloudformation/cfn-create-ssm-automation-secretmanager-adjoin.yml), and save it locally to your computer to create a new CloudFormation stack. Creating a new stack will simplify the deployment of the Automation runbook and create the appropriate parameters to perform the AD join/unjoin activities automatically. To learn more about CloudFormation stack creation, visit the [AWS documentation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/GettingStarted.Walkthrough.html#GettingStarted.Walkthrough.createstack).
 
 To create the Automation runbook manually, you can download the template separately from [here](templates/systemsmanager/ssm-automation-domainjoinunjoin.yaml) and create a custom Automation runbook manually. Visit the AWS documentation to learn [how to create runbooks with the Document Builder](https://docs.aws.amazon.com/systems-manager/latest/userguide/automation-document-builder.html) or [how to create runbooks with the Editor](https://docs.aws.amazon.com/systems-manager/latest/userguide/automation-document-editor.html).
 
-# Parameter Store
-The Automation runbook requires parameters stored in Systems Manager Parameter Store to complete the domain join and unjoining activities. If you chose to deploy the environment using the CloudFormation stack, these parameters are created automatically. Otherwise, the parameters must be created manually. This includes the AD domain name (FQDN), AD username, AD password, and a targetOU. To learn more about Parameter Store, visit the [AWS documentation](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html).
+# Secret store AD domain configuration
+The runbook uses a secret to store the AD credentials in Secrets Manager. Secrets Manager helps you manage and retrieve the AD credentials needed to perform AD join and unjoin activities. The secret is encrypted and decrypted with an AWS KMS [customer managed key](https://docs.aws.amazon.com/kms/latest/developerguide/concepts.html#customer-cmk). The customer managed key is an AWS KMS key that is created, owned and managed by you and can be shared to other AWS accounts and AWS Regions if needed. The secret and customer managed key are referenced in the runbook, specifically in the PowerShell scripts, by using the secret’s value and customer managed key ID specified when the secret is created. These values are not hard coded in the PowerShell code, allowing AD admins to rotate the password and securely update the secret without modifying the code.
+In particular, this solution uses 4 values:
+- Fully qualified domain name (FQDN) of the AD domain.
+- AD username.
+- AD password.
+- Specific organizational unit (OU) in AD where the computer account for the domain-joined instance will be created.
 
-Below are details of the parameters that are created by the CloudFormation stack or manually if you choose not to use CloudFormation (NOTE: the parameter names and values are cAsE-SeNsItIvE).
+Below is an example of the secret stored in JSON within Secrets Manager with the AD credentials, domain name, and OU, all of which are required to complete the domain join and unjoin activities. The CloudFormation template will create the secret automatically after filling in the input parameters.
 
-|Name (do not change these values)	|Type	|Data type	|Value (example values)	|AWS KMS Key ID Required	|
-|---	|---	|---	|---	|---	|
-|domainName	|String	|text	|corp.example.com	|No	|
-|domainJoinUserName	|String	|text	|CORP\Admin	|No	|
-|domainJoinPassword	|SecureString	|text	|YOURPASSWORD	|Yes	|
-|defaultTargetOU	|String	|text	|OU=Computers,OU=CORP,dc=corp,dc=example,dc=com	|No	|
+> The keys and values are case sensitive. The plaintext value of the **domainJoinUserName** key requires two backslashes to parse the down-level logon name format.
+
+```json
+{
+    "domainName": " corp.example.com",
+    "domainJoinUserName": "CORP\\Admin",
+    "domainJoinPassword": " YOURPASSWORD",
+    "defaultTargetOU": " OU=Computers,OU=CORP,dc=corp,dc=example,dc=com"
+} 
+```
 
 ## PowerShell
 
@@ -43,12 +52,13 @@ Within the Systems Manager Automation runbook there are two steps where either d
 ```powershell
 If ((Get-CimInstance -ClassName 'Win32_ComputerSystem' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty 'PartOfDomain') -eq $false) {
     Try {
-        $targetOU = (Get-SSMParameterValue -Name 'defaultTargetOU' -ErrorAction Stop).Parameters[0].Value
-        $domainName = (Get-SSMParameterValue -Name 'domainName' -ErrorAction Stop).Parameters[0].Value
-        $domainJoinUserName = (Get-SSMParameterValue -Name 'domainJoinUserName' -ErrorAction Stop).Parameters[0].Value
-        $domainJoinPassword = (Get-SSMParameterValue -Name 'domainJoinPassword' -WithDecryption:$true -ErrorAction Stop).Parameters[0].Value | ConvertTo-SecureString -AsPlainText -Force
+        $jsonSecretValue = (Get-SECSecretValue -SecretId ${SecretKeyADPasswordResource}).SecretString | ConvertFrom-Json
+        $targetOU = $jsonSecretValue.defaultTargetOU
+        $domainName = $jsonSecretValue.domainName
+        $domainJoinUserName = $jsonSecretValue.domainJoinUserName
+        $domainJoinPassword = $jsonSecretValue.domainJoinPassword | ConvertTo-SecureString -AsPlainText -Force
     } Catch [System.Exception] {
-        Write-Output " Failed to get SSM Parameter(s) $_"
+        Write-Output "Failed to get secret $_"
     }
     $domainCredential = New-Object System.Management.Automation.PSCredential($domainJoinUserName, $domainJoinPassword)
 
@@ -69,11 +79,12 @@ If ((Get-CimInstance -ClassName 'Win32_ComputerSystem' -ErrorAction SilentlyCont
 ```powershell
 If ((Get-CimInstance -ClassName 'Win32_ComputerSystem' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty 'PartOfDomain') -eq $true) {
     Try {
-        $domainName = (Get-SSMParameterValue -Name 'domainName' -ErrorAction Stop).Parameters[0].Value
-        $domainJoinUserName = (Get-SSMParameterValue -Name 'domainJoinUserName' -ErrorAction Stop).Parameters[0].Value
-        $domainJoinPassword = (Get-SSMParameterValue -Name 'domainJoinPassword' -WithDecryption:$true -ErrorAction Stop).Parameters[0].Value | ConvertTo-SecureString -AsPlainText -Force
+        $jsonSecretValue = (Get-SECSecretValue -SecretId ${SecretKeyADPasswordResource}).SecretString | ConvertFrom-Json 
+        $domainName = $jsonSecretValue.domainName
+        $domainJoinUserName = $jsonSecretValue.domainJoinUserName
+        $domainJoinPassword = $jsonSecretValue.domainJoinPassword | ConvertTo-SecureString -AsPlainText -Force
     } Catch [System.Exception] {
-        Write-Output "Failed to get SSM Parameter(s) $_"
+        Write-Output "Failed to get secret $_"
     }
 
     $domainCredential = New-Object System.Management.Automation.PSCredential($domainJoinUserName, $domainJoinPassword)
@@ -104,9 +115,9 @@ If ((Get-CimInstance -ClassName 'Win32_ComputerSystem' -ErrorAction SilentlyCont
 }
 ```
 
-With the exception of the parameters from the Systems Manager Parameter Store, the PowerShell script should be familiar to any admin who leverages PowerShell AD cmdlets to execute domain join activities. There are **exit codes** specific to Systems Manager that allow the Automation runbook to identify failures during the domain join or unjoin process. Without the exit codes, a failed domain join, for example, may still be marked as **Success** despite not having been added to an AD domain. Learn more about exit codes by visiting [AWS documentation](https://docs.aws.amazon.com/systems-manager/latest/userguide/command-exit-codes.html).
+With the exception of the secret, the PowerShell script should be familiar to any admin who leverages PowerShell AD cmdlets to execute domain join activities. There are **exit codes** specific to Systems Manager that allow the Automation runbook to identify failures during the domain join or unjoin process. Without the exit codes, a failed domain join, for example, may still be marked as **Success** despite not having been added to an AD domain. Learn more about exit codes by visiting [AWS documentation](https://docs.aws.amazon.com/systems-manager/latest/userguide/command-exit-codes.html).
 
-NOTE: the PowerShell can be customized as needed. Also, AD credentials are currently stored as parameters in Systems Manager Parameter Store. However, customers can choose to store these credentials as secrets in AWS Secrets Manager. To learn more about Secrest Manager, visit the [AWS documentation](https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html)
+> The PowerShell can be customized as needed and provided as-is. Testing in your environment is required to confirm proper functionality within your AD environment!
 
 ## Security
 

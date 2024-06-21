@@ -117,7 +117,7 @@ If ((Get-CimInstance -ClassName 'Win32_ComputerSystem' -ErrorAction SilentlyCont
 
 With the exception of the secret, the PowerShell script should be familiar to any admin who leverages PowerShell AD cmdlets to execute domain join activities. There are **exit codes** specific to Systems Manager that allow the Automation runbook to identify failures during the domain join or unjoin process. Without the exit codes, a failed domain join, for example, may still be marked as **Success** despite not having been added to an AD domain. Learn more about exit codes by visiting [AWS documentation](https://docs.aws.amazon.com/systems-manager/latest/userguide/command-exit-codes.html).
 
-> The PowerShell can be customized as needed and provided as-is. Testing in your environment is required to confirm proper functionality within your AD environment!
+> The PowerShell can be customized as needed and provided as-is. Testing is required to confirm proper functionality within your AD environment!
 
 ## Security
 

@@ -14,6 +14,10 @@ Parameters:
       - m5.large
       - c5.large
     Description: Select an instance type. The default instance type is t3.medium.
+  IamInstanceProfileARNParameter:
+    Type: String
+    Description: Enter the IAM Instance Profile ARN for Windows EC2 instances.
+    Default: arn:aws:iam::AWSACCOUNTID:instance-profile/IAMINSTANCEPROFILE
   LaunchTemplateSecurityGroupParameter:
     Type: List<AWS::EC2::SecurityGroup::Id>
     Description: Select EC2 security group to assign to the launch template.
@@ -39,9 +43,6 @@ Parameters:
   ASGSubnetParameter:
     Type: List<AWS::EC2::Subnet::Id>
     Description: Select EC2 subnets to assign to the Auto Scaling Group.
-  KMSKeyArnParameter:
-    Type: String
-    Description: Type the KMS key ARN used to encrypt/decrypt the AD domain join password.
   SSMAutomationRunbookParameter:
     Type: String
     Description: Type the name of the SSM Automation runbook that performs the AD domain join and unjoin.
@@ -54,6 +55,7 @@ Metadata:
           - ImageIdParameter
           - InstanceTypeParameter
           - LaunchTemplateSecurityGroupParameter
+          - IamInstanceProfileARNParameter
       - Label:
           default: Amazon EC2 Auto Scaling Configuration
         Parameters:
@@ -65,7 +67,6 @@ Metadata:
           default: Misc. Configuration
         Parameters:
           - VpcIdParameter
-          - KMSKeyArnParameter
           - SSMAutomationRunbookParameter
     ParameterLabels:
       ImageIdParameter:
@@ -74,6 +75,8 @@ Metadata:
         default: Instance Type
       LaunchTemplateSecurityGroupParameter:
         default: Security Group
+      IamInstanceProfileARNParameter:
+        default: Instance IAM Profile ARN
       VpcIdParameter:
         default: Vpc Id
       ASGSubnetParameter:
@@ -84,8 +87,6 @@ Metadata:
         default: Maximum Size
       ASGDesiredCapacityParameter:
         default: Desired Capacity
-      KMSKeyArnParameter:
-        default: KMS Key ARN
       SSMAutomationRunbookParameter:
         default: AWS Systems Manager Automation Runbook
 Resources:
@@ -97,7 +98,7 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: !Sub 'ssm.amazonaws.com'
+              Service: ssm.amazonaws.com
             Action: sts:AssumeRole
       Path: /
       ManagedPolicyArns:
@@ -105,7 +106,7 @@ Resources:
   SSMEC2SSMPermissionsCFNResource:
     Type: AWS::IAM::Policy
     Properties:
-      PolicyName: SSMEC2SSMPermissionsCFN
+      PolicyName: !Sub 'EC2SSMPermissions-${AWS::StackName}'
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -137,27 +138,6 @@ Resources:
               - '*'
       Roles:
         - !Ref 'SSMAssumeRoleResource'
-  SSMParametersCFNResource:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyName: SSMParametersCFN
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Action:
-              - kms:Decrypt
-              - ssm:DescribeParameters
-              - ssm:GetParameters
-              - ssm:GetParameter
-            Resource:
-              - !Ref 'KMSKeyArnParameter'
-              - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/domainJoinPassword'
-              - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/domainJoinUserName'
-              - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/domainName'
-              - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/defaultTargetOU-Windows'
-      Roles:
-        - !Ref 'SSMAssumeRoleResource'
   EventBridgeInvokeRoleResource:
     Type: AWS::IAM::Role
     Properties:
@@ -166,11 +146,11 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: !Sub 'events.amazonaws.com'
+              Service: events.amazonaws.com
             Action: sts:AssumeRole
       Path: /service-role/
       Policies:
-        - PolicyName: EVBInvokeRoleCFN
+        - PolicyName: !Sub 'InvokeFunctionPermissions-${AWS::StackName}'
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -181,29 +161,6 @@ Resources:
               - Effect: Allow
                 Action: iam:PassRole
                 Resource: !GetAtt 'SSMAssumeRoleResource.Arn'
-  EC2SSMRoleResource:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - ec2.amazonaws.com
-            Action:
-              - sts:AssumeRole
-      Path: /
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-        - arn:aws:iam::aws:policy/AmazonEC2FullAccess
-      Description: New IAM Role to allow SSM access.
-  IamInstanceProfileResource:
-    Type: AWS::IAM::InstanceProfile
-    Properties:
-      Path: /
-      Roles:
-        - !Ref EC2SSMRoleResource
   EC2LaunchTemplateResource:
     Type: AWS::EC2::LaunchTemplate
     DeletionPolicy: Delete
@@ -216,7 +173,7 @@ Resources:
             - '0'
             - !Ref LaunchTemplateSecurityGroupParameter
         IamInstanceProfile:
-          Arn: !GetAtt IamInstanceProfileResource.Arn
+          Arn: !Ref IamInstanceProfileARNParameter
   SNSTopicResource:
     Type: AWS::SNS::Topic
     Properties:

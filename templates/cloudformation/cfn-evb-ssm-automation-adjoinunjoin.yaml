@@ -8,9 +8,9 @@ Parameters:
       /aws/service/ami-windows-latest/Windows_Server-2019-English-Core-Base.'
   InstanceTypeParameter:
     Type: String
-    Default: t3.medium
+    Default: t3.xlarge
     AllowedValues:
-      - t3.medium
+      - t3.xlarge
       - m5.large
       - c5.large
     Description: Select an instance type. The default instance type is t3.medium.

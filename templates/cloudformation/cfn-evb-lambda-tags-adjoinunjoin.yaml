@@ -1,20 +1,19 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Lambda function that will domain join or unjoin EC2 instances based on EC2 tag values.
 Parameters:
-  SSMAutomationRunbookArnParameter:
+  SSMAutomationRunbookNameParameter:
     Type: String
-    Description: Enter the AWS Systems Manager Automation runbook ARN used to perform the AD domain join or domain unjoin.
-    Default: arn:aws:ssm:AWSREGION:AWSACCOUNTID:automation-definition/ADJOINUNJOINRUNBOOK
+    Description: Enter the AWS Systems Manager Automation runbook name used to perform the AD domain join or domain unjoin.
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
           default: AWS Systems Manager Autmation
         Parameters:
-          - SSMAutomationRunbookArnParameter
+          - SSMAutomationRunbookNameParameter
     ParameterLabels:
-      SSMAutomationRunbookArnParameter:
-        default: Automation runbook ARN.
+      SSMAutomationRunbookNameParameter:
+        default: Automation runbook name.
 Resources:
   IAMRoleLambdaFunctionResource:
     Type: AWS::IAM::Role
@@ -58,8 +57,8 @@ Resources:
                   - ssm:ListCommandInvocations
                 Resource:
                   - '*'
-                  - !Sub '${SSMAutomationRunbookArnParameter}:$DEFAULT'
-  ADJoinLambdaFunctionResource:
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:automation-definition/${SSMAutomationRunbookNameParameter}:$DEFAULT'
+  ADJoinUnjoinLambdaFunctionResource:
     Type: AWS::Lambda::Function
     Properties:
       Runtime: python3.12
@@ -106,10 +105,10 @@ Resources:
                         else:
                             print("The tag value for " + tag_output_key + " is not valid to perform the domain join/unjoin automation. Value must be Join or Unjoin.")
                         break
-      Description: 'Python based Lambda function that will domain join or unjoin EC2 instances based on EC2 tag values for key StartEvent.'
+      Description: 'Python based Lambda function that will trigger AD domain join or unjoin EC2 instances based on EC2 tag values for key StartEvent.'
       Environment:
         Variables:
-          automation_runbook_arn_var: !Ref SSMAutomationRunbookArnParameter
+          automation_runbook_arn_var: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:automation-definition/${SSMAutomationRunbookNameParameter}'
       TracingConfig:
         Mode: Active
   LambdaFunctionPolicyUpdate:
@@ -122,7 +121,7 @@ Resources:
               - Effect: Allow
                 Action: lambda:InvokeFunction
                 Resource:
-                  - !GetAtt ADJoinLambdaFunctionResource.Arn
+                  - !GetAtt ADJoinUnjoinLambdaFunctionResource.Arn
       RoleName: !Ref IAMRoleLambdaFunctionResource
   ADJoinUnjoinTagEVBRuleResource:
     Type: AWS::Events::Rule
@@ -143,13 +142,11 @@ Resources:
       EventBusName: default
       Targets:
         - Id: 'TargetLambdaFunction-ADJoinUnjoin'
-          Arn: !GetAtt ADJoinLambdaFunctionResource.Arn
+          Arn: !GetAtt ADJoinUnjoinLambdaFunctionResource.Arn
   PermissionForEventsToInvokeLambdaResource: 
     Type: AWS::Lambda::Permission
     Properties: 
-      FunctionName: 
-        Ref: LambdaFunction
+      FunctionName: !Ref ADJoinUnjoinLambdaFunctionResource
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
-      SourceArn: 
-        !GetAtt ADJoinUnjoinTagEVBRuleResource.Arn
+      SourceArn: !GetAtt ADJoinUnjoinTagEVBRuleResource.Arn

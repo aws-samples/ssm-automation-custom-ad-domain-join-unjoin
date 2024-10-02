@@ -21,9 +21,6 @@ Parameters:
   LaunchTemplateSecurityGroupParameter:
     Type: List<AWS::EC2::SecurityGroup::Id>
     Description: Select EC2 security group to assign to the launch template.
-  VpcIdParameter:
-    Type: List<AWS::EC2::VPC::Id>
-    Description: List of Virtual Private Cloud (VPC) Ids in your account.
   SNSEndpointParameter:
     Type: String
     Default: user@email.com
@@ -66,7 +63,7 @@ Metadata:
       - Label:
           default: Misc. Configuration
         Parameters:
-          - VpcIdParameter
+          - SNSEndpointParameter
           - SSMAutomationRunbookParameter
     ParameterLabels:
       ImageIdParameter:
@@ -77,8 +74,8 @@ Metadata:
         default: Security Group
       IamInstanceProfileARNParameter:
         default: Instance IAM Profile ARN
-      VpcIdParameter:
-        default: Vpc Id
+      SNSEndpointParameter:
+        default: SNS Endpoint
       ASGSubnetParameter:
         default: VPC Subnets
       ASGMinSizeParameter:
@@ -103,7 +100,7 @@ Resources:
       Path: /
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-  SSMEC2SSMPermissionsCFNResource:
+  EC2SSMPermissionsCFNResource:
     Type: AWS::IAM::Policy
     Properties:
       PolicyName: !Sub 'EC2SSMPermissions-${AWS::StackName}'

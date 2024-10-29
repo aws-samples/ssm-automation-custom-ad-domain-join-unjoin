@@ -210,6 +210,10 @@ Resources:
             - autoscaling:EC2_INSTANCE_LAUNCH
             - autoscaling:EC2_INSTANCE_TERMINATE
           TopicARN: !Ref SNSTopicResource
+      Tags:
+        - Key: Name
+          Value: AD-ASG-Join-Demo
+          PropagateAtLaunch: true
   EVBADJoinRuleResource:
     Type: AWS::Events::Rule
     Properties:

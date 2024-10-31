@@ -8,7 +8,7 @@ def lambda_handler(event, context):
     instance_id = resources[0]
     instance_id_match = re.search('i-[a-f0-9]{8}(?:[a-f0-9]{9})?$',instance_id)
     instance_id = instance_id_match.group(0)
-    automation_runbook_arn = os.environ.get('automation_runbook_arn_var')
+    automation_runbook_arn = 'arn:aws:ssm:AWSRegion:AWSAccountId:automation-definition/SSMAutomationRunbookName'
     ec2_client = boto3.client('ec2',region)
     ssm_client = boto3.client('ssm',region)
     instance_state_code = ec2_client.describe_instances(InstanceIds=[instance_id])['Reservations'][0]['Instances'][0]['State']['Code']

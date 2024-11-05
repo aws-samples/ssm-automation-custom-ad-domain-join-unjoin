@@ -217,7 +217,7 @@ Resources:
   EVBADJoinRuleResource:
     Type: AWS::Events::Rule
     Properties:
-      Description: Rule that will join Auto Scaled EC2 Windows instance to AD domain at instance launch.
+      Description: Rule that will join Auto Scaled EC2 Windows instance to an AD domain at instance launch.
       EventBusName: default
       EventPattern:
         source:
@@ -239,7 +239,7 @@ Resources:
   EVBADUnjoinRuleResource:
     Type: AWS::Events::Rule
     Properties:
-      Description: Rule that will unjoin Auto Scaled EC2 Windows instance from AD domain prior to termination.
+      Description: Rule that will unjoin Auto Scaled EC2 Windows instance from an AD domain prior to termination.
       EventBusName: default
       EventPattern:
         source:

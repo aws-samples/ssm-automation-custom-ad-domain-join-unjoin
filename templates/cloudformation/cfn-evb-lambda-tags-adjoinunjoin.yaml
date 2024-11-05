@@ -123,6 +123,7 @@ Resources:
   ADJoinUnjoinTagEVBRuleResource:
     Type: AWS::Events::Rule
     Properties:
+      Description: Rule that will join or unjoin EC2 Windows instances to an AD domain with tags.
       EventPattern:
         source:
           - aws.tag

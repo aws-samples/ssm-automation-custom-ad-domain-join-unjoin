@@ -1,6 +1,6 @@
-## Event-driven Active Directory domain join with Amazon EventBridge
+# Event-driven Active Directory domain join with Amazon EventBridge
 
-# Overview
+## Overview
 Please refer to blog post for more details: [https://aws.amazon.com/blogs/modernizing-with-aws/event-driven-active-directory-domain-join-with-amazon-eventbridge/](https://aws.amazon.com/blogs/modernizing-with-aws/event-driven-active-directory-domain-join-with-amazon-eventbridge/).
 
 [Amazon EventBridge](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-what-is.html) can automate Microsoft Active Directory (AD) domain join and unjoin for your [Amazon Elastic Compute Cloud (Amazon EC2)](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html) instances. In a previous [post](https://aws-samples.github.io/technical-notes-for-microsoft-workloads-on-aws/Active%20Directory/Guides/Active_Directory_domain_join_with_AWS_Systems_Manager_and_AWS_Secrets_Manager/), I showed you how [AWS Systems Manager Automation](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-automation.html) can dynamically domain join and unjoin EC2 instances manually. I will show you two examples of AD domain join and unjoin automation that are event driven, Amazon EC2 tag triggering [AWS Lambda](https://docs.aws.amazon.com/lambda/latest/dg/welcome.html) and [Amazon EC2 Auto Scaling](https://docs.aws.amazon.com/autoscaling/ec2/userguide/what-is-amazon-ec2-auto-scaling.html).

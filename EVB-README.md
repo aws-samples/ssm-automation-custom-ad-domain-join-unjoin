@@ -3,7 +3,7 @@
 ## Overview
 Please refer to blog post for more details: [https://aws.amazon.com/blogs/modernizing-with-aws/event-driven-active-directory-domain-join-with-amazon-eventbridge/](https://aws.amazon.com/blogs/modernizing-with-aws/event-driven-active-directory-domain-join-with-amazon-eventbridge/).
 
-[Amazon EventBridge](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-what-is.html) can automate Microsoft Active Directory (AD) domain join and unjoin for your [Amazon Elastic Compute Cloud (Amazon EC2)](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html) instances. In a previous [post](https://aws-samples.github.io/technical-notes-for-microsoft-workloads-on-aws/Active%20Directory/Guides/Active_Directory_domain_join_with_AWS_Systems_Manager_and_AWS_Secrets_Manager/), I showed you how [AWS Systems Manager Automation](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-automation.html) can dynamically domain join and unjoin EC2 instances manually. I will show you two examples of AD domain join and unjoin automation that are event driven, Amazon EC2 tag triggering [AWS Lambda](https://docs.aws.amazon.com/lambda/latest/dg/welcome.html) and [Amazon EC2 Auto Scaling](https://docs.aws.amazon.com/autoscaling/ec2/userguide/what-is-amazon-ec2-auto-scaling.html).
+[Amazon EventBridge](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-what-is.html) can automate Microsoft Active Directory (AD) domain join and unjoin for your [Amazon Elastic Compute Cloud (Amazon EC2)](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/concepts.html) instances. This guide provides two examples of AD domain join and unjoin automation that are event driven, Amazon EC2 tag triggering [AWS Lambda](https://docs.aws.amazon.com/lambda/latest/dg/welcome.html) and [Amazon EC2 Auto Scaling](https://docs.aws.amazon.com/autoscaling/ec2/userguide/what-is-amazon-ec2-auto-scaling.html).
 
 ## Solution Overview
 
@@ -13,8 +13,7 @@ EventBridge is a serverless service that lets you connect applications using eve
 
 Both solutions are available as [AWS CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/Welcome.html) templates. To start, deploy the [Automation runbook](https://github.com/aws-samples/ssm-automation-custom-ad-domain-join-unjoin/blob/main/templates/cloudformation/cfn-create-ssm-automation-secretmanager-adjoin.yml) from the previous post.
 
-**Note:** This guide assumes DNS has been configured already for your AD environment running in AWS. Configuring DNS at scale is beyond the scope of this blog. You can review existing guides to configure such an environment with either [Amazon Route 53 Resolver endpoints](https://d1.awsstatic.com/whitepapers/aws-hybrid-dns-with-active-directory.pdf) or [DHCP option sets in Amazon
-VPC](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_DHCP_Options.html).
+**Note:** This guide assumes DNS has been configured already for your AD environment running in AWS. Configuring DNS at scale is beyond the scope of this blog. You can review existing guides to configure such an environment with either [Amazon Route 53 Resolver endpoints](https://d1.awsstatic.com/whitepapers/aws-hybrid-dns-with-active-directory.pdf) or [DHCP option sets in Amazon VPC](https://docs.aws.amazon.com/vpc/latest/userguide/VPC_DHCP_Options.html).
 
 The components of the [EC2 tag solution](https://github.com/aws-samples/ssm-automation-custom-ad-domain-join-unjoin/blob/main/templates/cloudformation/cfn-evb-lambda-tags-adjoinunjoin.yaml) include:
 
